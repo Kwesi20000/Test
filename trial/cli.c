@@ -3,53 +3,71 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <string.h>
+
+#define MAX_INPUT_SIZE 1024
 
 int main(void)
 {
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
+    char input[MAX_INPUT_SIZE];
     pid_t child_pid;
     int status;
 
     while (1)
     {
         printf("($) ");
-        read = getline(&line, &len, stdin);
-
-        if (read == -1)  // Handle end of file (Ctrl+D)
+        if (fgets(input, sizeof(input), stdin) == NULL)
         {
+            // Handle end of file (Ctrl+D)
             if (isatty(STDIN_FILENO))
                 printf("\n");
             break;
         }
 
-        if (line[read - 1] == '\n')
-            line[read - 1] = '\0';
+        // Remove trailing newline, if present
+        size_t len = strlen(input);
+        if (len > 0 && input[len - 1] == '\n')
+            input[len - 1] = '\0';
+
+        if (strcmp(input, "exit") == 0)
+        {
+            // Exit the shell if the user enters "exit"
+            break;
+        }
 
         child_pid = fork();
         if (child_pid == -1)
         {
             perror("Error");
-            return (EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
 
         if (child_pid == 0)
         {
-            if (execve(line, NULL, environ) == -1)
-            {
-                perror("Error");
-                free(line);
-                exit(EXIT_FAILURE);
-            }
+            char *args[] = {input, NULL};
+            execvp(input, args);
+
+            // If execvp fails, print an error and exit
+            perror("Error");
+            exit(EXIT_FAILURE);
         }
         else
         {
-            wait(&status);
+            // Parent process waits for the child
+            waitpid(child_pid, &status, 0);
+
+            // Check if the child process exited normally
+            if (WIFEXITED(status))
+            {
+                printf("Child exited with status %d\n", WEXITSTATUS(status));
+            }
+            else if (WIFSIGNALED(status))
+            {
+                printf("Child terminated by signal %d\n", WTERMSIG(status));
+            }
         }
     }
 
-    free(line);
-    return (EXIT_SUCCESS);
+    return EXIT_SUCCESS;
 }
 
