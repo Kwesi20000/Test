@@ -13,6 +13,7 @@ char *read_input(void);
 int execute_command(char *command);
 void tokenize_input(char *line, char *args[], int *argc);
 int execute_command_arg(char *args[]);
-
+char *get_command_path(const char *command);
+int execute_command_path(char *command);
 #endif /* SHELL_H */
 
